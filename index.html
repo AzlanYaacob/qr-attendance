@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Attendance</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151821;
+    --surface2: #1c202d;
+    --border: #2a2f3e;
+    --accent: #4ade80;
+    --accent2: #22d3ee;
+    --danger: #f87171;
+    --warning: #fbbf24;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --font: 'Syne', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 1.5rem 0;
+  }
+  .sidebar-logo {
+    padding: 0 1.25rem 1.5rem;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+  .sidebar-logo span { color: var(--muted); }
+  .nav-item {
+    padding: 0.6rem 1.25rem;
+    font-size: 13px; cursor: pointer; border-radius: 0;
+    transition: background 0.15s;
+    color: var(--muted);
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(74,222,128,0.06); }
+  .nav-section { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 1rem 1.25rem 0.4rem; margin-top: 0.5rem; }
+
+  .main { flex: 1; overflow: auto; }
+  .topbar {
+    height: 52px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.75rem;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-title { font-size: 14px; font-weight: 600; }
+  .page { padding: 1.75rem; max-width: 960px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem;
+  }
+  .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.75rem; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0.5rem 1rem; border-radius: 6px; font-size: 13px;
+    font-family: var(--font); font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #0d0f14; border-color: var(--accent); }
+  .btn-primary:hover { background: #22c55e; }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--surface2); }
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn-danger:hover { background: rgba(248,113,113,0.1); }
+  .btn-sm { padding: 0.35rem 0.7rem; font-size: 12px; }
+
+  /* ── Form ── */
+  .form-group { margin-bottom: 1rem; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 0.35rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  input, select {
+    width: 100%; padding: 0.6rem 0.85rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: var(--font); font-size: 14px;
+    outline: none; transition: border 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent2); }
+  select option { background: var(--surface2); }
+
+  /* ── Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 100px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  }
+  .badge-green { background: rgba(74,222,128,0.15); color: var(--accent); }
+  .badge-gray { background: rgba(107,114,128,0.2); color: var(--muted); }
+  .badge-cyan { background: rgba(34,211,238,0.15); color: var(--accent2); }
+
+  /* ── Stat card ── */
+  .stat { text-align: center; padding: 1rem; }
+  .stat-num { font-size: 28px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+  /* ── QR panel ── */
+  .qr-panel {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem; background: var(--surface2); border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  #qr-canvas { background: white; padding: 12px; border-radius: 8px; margin-bottom: 1rem; }
+  .qr-token-display {
+    font-family: var(--mono); font-size: 22px; letter-spacing: 0.2em;
+    color: var(--accent); font-weight: 500; margin-bottom: 0.5rem;
+  }
+  .timer-bar-wrap { width: 200px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 0.5rem; }
+  .timer-bar { height: 100%; background: var(--accent); transition: width 1s linear; border-radius: 2px; }
+  .timer-label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── Attendance table ── */
+  .att-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .att-table th { padding: 0.5rem 0.75rem; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; }
+  .att-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--text); }
+  .att-table tr:last-child td { border-bottom: none; }
+  .att-table tr:hover td { background: var(--surface2); }
+
+  /* ── Session list ── */
+  .session-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; transition: border-color 0.15s;
+    margin-bottom: 0.6rem;
+  }
+  .session-card:hover { border-color: var(--accent2); }
+  .session-info h3 { font-size: 14px; font-weight: 600; }
+  .session-info p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Student page ── */
+  .student-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: var(--bg); padding: 1.5rem;
+  }
+  .student-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 2rem; width: 100%; max-width: 400px;
+  }
+  .student-logo { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.5rem; }
+
+  /* ── Sections ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Export row ── */
+  .export-row { display: flex; gap: 0.5rem; align-items: center; }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 13px; }
+  .empty-icon { font-size: 32px; margin-bottom: 0.75rem; }
+
+  /* ── Toasts ── */
+  #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.75rem 1rem; font-size: 13px; min-width: 240px;
+    animation: slide-in 0.2s ease; display: flex; gap: 8px; align-items: center;
+  }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  @keyframes slide-in { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Responsive ── */
+  @media(max-width: 640px) {
+    .sidebar { display: none; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ════════════════════════════════════════ STUDENT VIEW ═══ -->
+<div id="student-view" style="display:none;">
+  <div class="student-wrap">
+    <div class="student-card">
+      <div class="student-logo">QR Attendance</div>
+      <div id="student-session-info" style="margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+        <div style="font-size:18px;font-weight:700;" id="stu-subject">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="stu-class">—</div>
+      </div>
+      <div id="student-form-area">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="stu-name" placeholder="e.g. Ahmad Farid bin Zulkifli" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label>Matric Number</label>
+          <input type="text" id="stu-matric" placeholder="e.g. 24M0001" autocomplete="off">
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;" onclick="submitAttendance()">Mark Attendance</button>
+      </div>
+      <div id="student-result" style="display:none;text-align:center;padding:1.5rem 0;">
+        <div id="student-result-icon" style="font-size:40px;margin-bottom:0.75rem;"></div>
+        <div id="student-result-msg" style="font-size:15px;font-weight:600;"></div>
+        <div id="student-result-sub" style="font-size:12px;color:var(--muted);margin-top:0.35rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ TEACHER VIEW ═══ -->
+<div id="teacher-view">
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">QR <span>Attend</span></div>
+    <div class="nav-section">Teacher</div>
+    <div class="nav-item active" onclick="showSection('dashboard')">📊 Dashboard</div>
+    <div class="nav-item" onclick="showSection('create')">＋ New Session</div>
+    <div id="nav-live" class="nav-item" onclick="showSection('qr')" style="display:none;color:var(--accent);border-left:2px solid var(--accent);background:rgba(74,222,128,0.08);">● Live Session</div>
+    <div class="nav-section">Sessions</div>
+    <div class="nav-item" onclick="showSection('sessions')">📋 All Sessions</div>
+    <div class="nav-section" style="margin-top:auto;padding-top:0.5rem;"></div>
+    <div style="padding:1rem 1.25rem;font-size:11px;color:var(--muted);">v1.0 · No login needed</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="live-indicator" style="display:none;font-size:11px;color:var(--accent);font-family:var(--mono);">● LIVE SESSION</span>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ── -->
+    <section id="sec-dashboard" class="section active page">
+      <div class="grid-3" style="margin-bottom:1.5rem;">
+        <div class="card stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total Sessions</div></div>
+        <div class="card stat"><div class="stat-num" id="stat-today">0</div><div class="stat-label">Today</div></div>
+        <div class="card stat"><div class="stat-num" id="stat-records">0</div><div class="stat-label">Records</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent Sessions</div>
+        <div id="dashboard-recent"></div>
+      </div>
+    </section>
+
+    <!-- ── CREATE SESSION ── -->
+    <section id="sec-create" class="section page">
+      <div class="card" style="max-width:520px;">
+        <div class="card-title">New Session</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Subject</label>
+            <input type="text" id="new-subject" placeholder="e.g. CHM455">
+          </div>
+          <div class="form-group">
+            <label>Class / Group</label>
+            <input type="text" id="new-class" placeholder="e.g. Semester 1 Group A">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="new-date">
+          </div>
+          <div class="form-group">
+            <label>Session Label</label>
+            <input type="text" id="new-label" placeholder="e.g. Lecture 5">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Token Rotation (seconds)</label>
+          <select id="new-rotation">
+            <option value="30">30 seconds</option>
+            <option value="60">60 seconds</option>
+            <option value="120">2 minutes</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:0.5rem;">
+          <button class="btn btn-primary" onclick="createSession()">Create & Show QR</button>
+          <button class="btn btn-ghost" onclick="showSection('sessions')">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ACTIVE QR ── -->
+    <section id="sec-qr" class="section page">
+
+      <!-- STEP 1: URL not set — block everything, force entry -->
+      <div id="url-gate" style="display:none;">
+        <div class="card" style="max-width:540px;border-color:var(--warning);">
+          <div style="font-size:15px;font-weight:600;margin-bottom:0.5rem;color:var(--warning);">⚠ One-time setup required</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;line-height:1.7;">
+            This app is running inside Claude, so it cannot detect its own URL. You must enter the <strong style="color:var(--text)">exact URL</strong> of where this HTML file is hosted — students' phones will open that URL when they scan the QR.
+            <br><br>
+            <span style="color:var(--accent2)">Quick hosting: drag this file to <strong>netlify.com/drop</strong> → copy the URL it gives you → paste below.</span>
+          </p>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input type="url" id="base-url-input" placeholder="https://your-site.netlify.app/qr-attendance.html" style="flex:1;font-size:13px;">
+            <button class="btn btn-primary" onclick="saveBaseUrl()">Confirm &amp; Show QR</button>
+          </div>
+          <div style="margin-top:0.75rem;font-size:11px;color:var(--muted);">This is saved permanently. You only do this once.</div>
+        </div>
+      </div>
+
+      <!-- STEP 2: URL confirmed — show QR -->
+      <div id="qr-ready" style="display:none;">
+        <!-- URL display strip — shows exactly what's encoded in QR -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);flex-shrink:0;">QR encodes:</span>
+          <span id="qr-url-preview" style="font-family:var(--mono);font-size:11px;color:var(--accent2);word-break:break-all;flex:1;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="resetBaseUrl()" style="flex-shrink:0;font-size:11px;">Change URL</button>
+        </div>
+
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;">
+          <!-- QR Panel -->
+          <div class="qr-panel" style="flex:0 0 auto;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.75rem;" id="qr-session-label">Session</div>
+            <div id="qr-canvas"></div>
+            <div class="qr-token-display" id="qr-token-text">——————</div>
+            <div class="timer-bar-wrap"><div class="timer-bar" id="timer-bar"></div></div>
+            <div class="timer-label" id="timer-label">Refreshing in 30s</div>
+            <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;">
+              <button class="btn btn-ghost btn-sm" onclick="forceRotate()">↺ Rotate Now</button>
+              <button class="btn btn-danger btn-sm" onclick="endSession()">■ End Session</button>
+            </div>
+          </div>
+          <!-- Live feed -->
+          <div style="flex:1;min-width:280px;">
+            <div class="card">
+              <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Live Attendance</span>
+                <span class="badge badge-green" id="live-count">0 present</span>
+              </div>
+              <div id="live-feed">
+                <div class="empty"><div class="empty-icon">⏳</div>Waiting for students...</div>
+              </div>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+              <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+              <button class="btn btn-ghost btn-sm" onclick="refreshLiveFeed()">↺ Refresh</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ALL SESSIONS ── -->
+    <section id="sec-sessions" class="section page">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-size:18px;font-weight:700;">All Sessions</div>
+        <button class="btn btn-primary btn-sm" onclick="showSection('create')">＋ New</button>
+      </div>
+      <div id="sessions-list"></div>
+    </section>
+
+    <!-- ── SESSION DETAIL ── -->
+    <section id="sec-detail" class="section page">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
+        <button class="btn btn-ghost btn-sm" onclick="showSection('sessions')">← Back</button>
+        <div style="font-size:18px;font-weight:700;" id="detail-title">Session Detail</div>
+        <span id="detail-status-badge"></span>
+      </div>
+      <div class="grid-3" style="margin-bottom:1.25rem;">
+        <div class="card stat"><div class="stat-num" id="detail-count">0</div><div class="stat-label">Attendees</div></div>
+        <div class="card stat"><div class="stat-num" id="detail-date" style="font-size:16px;"></div><div class="stat-label">Date</div></div>
+        <div class="card stat"><div class="stat-num" id="detail-class" style="font-size:14px;"></div><div class="stat-label">Class</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;">
+          <span>Attendance Records</span>
+          <div class="export-row">
+            <button class="btn btn-ghost btn-sm" id="detail-export-btn" onclick="exportDetailCSV()">⬇ CSV</button>
+            <button class="btn btn-danger btn-sm" id="detail-delete-btn" onclick="deleteSession()">🗑 Delete</button>
+          </div>
+        </div>
+        <div id="detail-table-wrap"></div>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// STORAGE HELPERS — localStorage (works on any host)
+// ══════════════════════════════════════════════════
+async function sget(key) {
+  try { const v = localStorage.getItem('qra:' + key); return v ? JSON.parse(v) : null; } catch { return null; }
+}
+async function sset(key, val) {
+  try { localStorage.setItem('qra:' + key, JSON.stringify(val)); } catch(e) { console.error('sset', e); }
+}
+async function sdel(key) {
+  try { localStorage.removeItem('qra:' + key); } catch {}
+}
+async function slist(prefix) {
+  try {
+    const full = 'qra:' + prefix;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(full)) keys.push(k.slice(4));
+    }
+    return keys;
+  } catch { return []; }
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let activeSession = null;
+let rotationInterval = null;
+let timerTick = null;
+let rotationSecs = 30;
+let currentSlot = null;
+let viewingSessionId = null;
+let savedBaseUrl = null;
+
+async function saveBaseUrl() {
+  const val = document.getElementById('base-url-input').value.trim();
+  if (!val || !val.startsWith('http')) { toast('Enter a valid URL starting with https://', 'error'); return; }
+  savedBaseUrl = val.replace(/\/$/, '');
+  await sset('base_url', savedBaseUrl);
+  showQRReady();
+  toast('URL saved — QR is live!', 'success');
+}
+
+// ══════════════════════════════════════════════════
+// TOKEN LOGIC
+// ══════════════════════════════════════════════════
+function getSlot(secs) { return Math.floor(Date.now() / (secs * 1000)); }
+
+function makeToken(sessionId, secret, slot) {
+  const raw = sessionId + ':' + slot + ':' + secret;
+  // Simple deterministic hash (no crypto needed, just obfuscated)
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) { hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0; }
+  const b = Math.abs(hash).toString(36).toUpperCase().padStart(6, '0');
+  const c = (Math.abs(hash * 31 + slot) % 1679616).toString(36).toUpperCase().padStart(4, '0');
+  return (b + c).slice(0, 8);
+}
+
+function getCurrentToken(session) {
+  const slot = getSlot(session.rotation);
+  return makeToken(session.id, session.secret, slot);
+}
+
+function isValidToken(session, token) {
+  const slot = getSlot(session.rotation);
+  return token === makeToken(session.id, session.secret, slot) ||
+         token === makeToken(session.id, session.secret, slot - 1);
+}
+
+// ══════════════════════════════════════════════════
+// URL ROUTING
+// ══════════════════════════════════════════════════
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  return { attend: p.get('attend'), sid: p.get('sid'), token: p.get('token') };
+}
+
+async function init() {
+  const { attend, sid, token } = getParams();
+  if (attend === '1' && sid && token) {
+    document.getElementById('teacher-view').style.display = 'none';
+    document.getElementById('student-view').style.display = 'block';
+    await loadStudentView(sid, token);
+  } else {
+    document.getElementById('teacher-view').style.display = 'block';
+    document.getElementById('student-view').style.display = 'none';
+    setDefaultDate();
+    savedBaseUrl = await sget('base_url');
+    await loadDashboard();
+    // Restore active session if exists
+    const activeSid = await sget('active_session');
+    if (activeSid) {
+      const sess = await sget('session:' + activeSid);
+      if (sess && sess.active) { activeSession = sess; rotationSecs = sess.rotation; await resumeQR(); }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// STUDENT VIEW
+// ══════════════════════════════════════════════════
+async function loadStudentView(sid, token) {
+  const sess = await sget('session:' + sid);
+  if (!sess || !sess.active) {
+    showStudentResult('❌', 'Session not active', 'This session has ended or does not exist.');
+    return;
+  }
+  if (!isValidToken(sess, token)) {
+    showStudentResult('⏰', 'QR Expired', 'The QR code you scanned has expired. Please ask your teacher to show the latest one.');
+    return;
+  }
+  document.getElementById('stu-subject').textContent = sess.subject + (sess.label ? ' — ' + sess.label : '');
+  document.getElementById('stu-class').textContent = sess.classGroup + ' · ' + sess.date;
+  document.getElementById('student-form-area').dataset.sid = sid;
+  document.getElementById('student-form-area').dataset.token = token;
+}
+
+async function submitAttendance() {
+  const name = document.getElementById('stu-name').value.trim();
+  const matric = document.getElementById('stu-matric').value.trim().toUpperCase();
+  const area = document.getElementById('student-form-area');
+  const sid = area.dataset.sid;
+  const token = area.dataset.token;
+
+  if (!name || !matric) { toast('Please fill in all fields', 'error'); return; }
+
+  const sess = await sget('session:' + sid);
+  if (!sess || !sess.active) { showStudentResult('❌', 'Session ended', 'This session is no longer accepting attendance.'); return; }
+  if (!isValidToken(sess, token)) { showStudentResult('⏰', 'QR Expired', 'The QR code has expired. Please re-scan the latest QR from your teacher.'); return; }
+
+  const existing = await sget('att:' + sid + ':' + matric);
+  if (existing) { showStudentResult('ℹ️', 'Already marked', 'Your attendance (' + matric + ') was already recorded at ' + new Date(existing.timestamp).toLocaleTimeString()); return; }
+
+  const record = { name, matric, timestamp: Date.now(), token };
+  await sset('att:' + sid + ':' + matric, record);
+
+  showStudentResult('✅', 'Attendance Recorded!', 'Welcome, ' + name + '! Recorded at ' + new Date().toLocaleTimeString());
+}
+
+function showStudentResult(icon, msg, sub) {
+  document.getElementById('student-form-area').style.display = 'none';
+  const res = document.getElementById('student-result');
+  res.style.display = 'block';
+  document.getElementById('student-result-icon').textContent = icon;
+  document.getElementById('student-result-msg').textContent = msg;
+  document.getElementById('student-result-sub').textContent = sub;
+}
+
+// ══════════════════════════════════════════════════
+// TEACHER — SESSION CREATION
+// ══════════════════════════════════════════════════
+function setDefaultDate() {
+  const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
+  document.getElementById('new-date').value = y+'-'+m+'-'+dd;
+}
+
+async function createSession() {
+  const subject = document.getElementById('new-subject').value.trim();
+  const classGroup = document.getElementById('new-class').value.trim();
+  const date = document.getElementById('new-date').value;
+  const label = document.getElementById('new-label').value.trim();
+  const rotation = parseInt(document.getElementById('new-rotation').value);
+
+  if (!subject || !classGroup || !date) { toast('Subject, class, and date are required', 'error'); return; }
+  if (activeSession) { toast('End the current session first', 'error'); return; }
+
+  const id = 'S' + Date.now().toString(36).toUpperCase();
+  const secret = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const sess = { id, subject, classGroup, date, label, rotation, secret, active: true, createdAt: Date.now() };
+
+  await sset('session:' + id, sess);
+  const list = (await sget('session_ids')) || [];
+  list.unshift(id);
+  await sset('session_ids', list);
+  await sset('active_session', id);
+
+  activeSession = sess;
+  rotationSecs = rotation;
+  await resumeQR();
+  toast('Session created: ' + subject, 'success');
+}
+
+// ══════════════════════════════════════════════════
+// QR DISPLAY
+// ══════════════════════════════════════════════════
+async function resumeQR() {
+  showSection('qr');
+  document.getElementById('live-indicator').style.display = 'inline';
+  document.getElementById('nav-live').style.display = 'block';
+  document.getElementById('qr-session-label').textContent = activeSession.subject + (activeSession.label ? ' · ' + activeSession.label : '') + ' · ' + activeSession.classGroup;
+
+  if (!savedBaseUrl) {
+    // Block on URL gate — don't render QR yet
+    document.getElementById('url-gate').style.display = 'block';
+    document.getElementById('qr-ready').style.display = 'none';
+    document.getElementById('base-url-input').value = '';
+    document.getElementById('base-url-input').focus();
+  } else {
+    showQRReady();
+  }
+  startTimer();
+  refreshLiveFeed();
+}
+
+async function saveBaseUrl() {
+  const val = document.getElementById('base-url-input').value.trim();
+  if (!val || !val.startsWith('http')) { toast('Enter a valid URL starting with https://', 'error'); return; }
+  savedBaseUrl = val.replace(/\/$/, '');
+  await sset('base_url', savedBaseUrl);
+  showQRReady();
+  toast('URL saved — QR is live!', 'success');
+}
+
+async function resetBaseUrl() {
+  savedBaseUrl = null;
+  await sdel('base_url');
+  document.getElementById('url-gate').style.display = 'block';
+  document.getElementById('qr-ready').style.display = 'none';
+  document.getElementById('base-url-input').value = '';
+  toast('URL cleared — enter new URL', 'success');
+}
+
+function showQRReady() {
+  document.getElementById('url-gate').style.display = 'none';
+  document.getElementById('qr-ready').style.display = 'block';
+  renderQR();
+}
+
+function getQRUrl() {
+  const token = getCurrentToken(activeSession);
+  // savedBaseUrl is always a real URL typed by teacher — never window.location
+  const base = savedBaseUrl.replace(/\?.*$/, '').replace(/\/$/, '');
+  return base + '?attend=1&sid=' + activeSession.id + '&token=' + token;
+}
+
+let qrInstance = null;
+function renderQR() {
+  if (!savedBaseUrl || !activeSession) return; // never render without a real URL
+  const url = getQRUrl();
+  const token = getCurrentToken(activeSession);
+  currentSlot = getSlot(activeSession.rotation);
+
+  document.getElementById('qr-token-text').textContent = token;
+  document.getElementById('qr-url-preview').textContent = url;
+
+  const container = document.getElementById('qr-canvas');
+  container.innerHTML = '';
+  new QRCode(container, { text: url, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+}
+
+function startTimer() {
+  if (timerTick) clearInterval(timerTick);
+  timerTick = setInterval(() => {
+    const now = Date.now();
+    const slotMs = rotationSecs * 1000;
+    const elapsed = now % slotMs;
+    const remaining = Math.ceil((slotMs - elapsed) / 1000);
+    const pct = ((slotMs - elapsed) / slotMs) * 100;
+
+    document.getElementById('timer-bar').style.width = pct + '%';
+    document.getElementById('timer-label').textContent = 'Refreshing in ' + remaining + 's';
+    document.getElementById('timer-bar').style.background = remaining <= 5 ? 'var(--warning)' : 'var(--accent)';
+
+    const newSlot = getSlot(rotationSecs);
+    if (newSlot !== currentSlot) { renderQR(); refreshLiveFeed(); }
+  }, 500);
+}
+
+function forceRotate() { renderQR(); toast('QR rotated', 'success'); }
+
+async function endSession() {
+  if (!activeSession) return;
+  if (!confirm('End this session? Students can no longer mark attendance.')) return;
+  activeSession.active = false;
+  await sset('session:' + activeSession.id, activeSession);
+  await sdel('active_session');
+  clearInterval(timerTick);
+  document.getElementById('live-indicator').style.display = 'none';
+  document.getElementById('nav-live').style.display = 'none';
+  const sid = activeSession.id;
+  activeSession = null;
+  toast('Session ended', 'success');
+  viewingSessionId = sid;
+  await loadDetail(sid);
+  showSection('detail');
+}
+
+// ══════════════════════════════════════════════════
+// LIVE FEED
+// ══════════════════════════════════════════════════
+async function refreshLiveFeed() {
+  if (!activeSession) return;
+  const records = await getSessionRecords(activeSession.id);
+  document.getElementById('live-count').textContent = records.length + ' present';
+  const feed = document.getElementById('live-feed');
+  if (records.length === 0) { feed.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Waiting for students...</div>'; return; }
+  feed.innerHTML = '<table class="att-table"><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Time</th></tr></thead><tbody>' +
+    records.map((r, i) => `<tr><td style="color:var(--muted)">${i+1}</td><td>${r.name}</td><td style="font-family:var(--mono);font-size:12px">${r.matric}</td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${new Date(r.timestamp).toLocaleTimeString()}</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+// ══════════════════════════════════════════════════
+// SESSIONS LIST
+// ══════════════════════════════════════════════════
+async function loadSessions() {
+  const ids = (await sget('session_ids')) || [];
+  const list = document.getElementById('sessions-list');
+  if (ids.length === 0) { list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>No sessions yet. Create one!</div>'; return; }
+  let html = '';
+  for (const id of ids) {
+    const s = await sget('session:' + id);
+    if (!s) continue;
+    const records = await getSessionRecords(id);
+    html += `<div class="session-card" onclick="openDetail('${id}')">
+      <div class="session-info">
+        <h3>${s.subject}${s.label ? ' — ' + s.label : ''} <span class="badge ${s.active ? 'badge-green' : 'badge-gray'}">${s.active ? 'LIVE' : 'Ended'}</span></h3>
+        <p>${s.classGroup} · ${s.date}</p>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:20px;font-weight:700;color:var(--accent);font-family:var(--mono)">${records.length}</div>
+        <div style="font-size:11px;color:var(--muted)">attendees</div>
+      </div>
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+async function openDetail(id) {
+  viewingSessionId = id;
+  await loadDetail(id);
+  showSection('detail');
+}
+
+async function loadDetail(id) {
+  const s = await sget('session:' + id);
+  if (!s) return;
+  const records = await getSessionRecords(id);
+  document.getElementById('detail-title').textContent = s.subject + (s.label ? ' — ' + s.label : '');
+  document.getElementById('detail-status-badge').innerHTML = `<span class="badge ${s.active ? 'badge-green' : 'badge-gray'}">${s.active ? 'LIVE' : 'Ended'}</span>`;
+  document.getElementById('detail-count').textContent = records.length;
+  document.getElementById('detail-date').textContent = s.date;
+  document.getElementById('detail-class').textContent = s.classGroup;
+
+  if (records.length === 0) {
+    document.getElementById('detail-table-wrap').innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No attendance yet</div>';
+    return;
+  }
+  document.getElementById('detail-table-wrap').innerHTML = '<table class="att-table"><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Timestamp</th></tr></thead><tbody>' +
+    records.map((r, i) => `<tr><td style="color:var(--muted)">${i+1}</td><td>${r.name}</td><td style="font-family:var(--mono);font-size:12px">${r.matric}</td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${new Date(r.timestamp).toLocaleString()}</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+async function deleteSession() {
+  if (!viewingSessionId) return;
+  if (!confirm('Delete this session and all its attendance records? This cannot be undone.')) return;
+  const records = await getSessionRecords(viewingSessionId);
+  for (const r of records) await sdel('att:' + viewingSessionId + ':' + r.matric);
+  await sdel('session:' + viewingSessionId);
+  const ids = (await sget('session_ids')) || [];
+  await sset('session_ids', ids.filter(x => x !== viewingSessionId));
+  viewingSessionId = null;
+  toast('Session deleted', 'success');
+  showSection('sessions');
+}
+
+// ══════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════
+async function loadDashboard() {
+  const ids = (await sget('session_ids')) || [];
+  const today = new Date().toISOString().slice(0, 10);
+  let totalRecords = 0, todayCount = 0;
+  let recentHtml = '';
+  for (const id of ids.slice(0, 5)) {
+    const s = await sget('session:' + id);
+    if (!s) continue;
+    const recs = await getSessionRecords(id);
+    totalRecords += recs.length;
+    if (s.date === today) todayCount++;
+    recentHtml += `<div class="session-card" onclick="openDetail('${id}')">
+      <div class="session-info"><h3>${s.subject}${s.label ? ' — '+s.label : ''} <span class="badge ${s.active?'badge-green':'badge-gray'}">${s.active?'LIVE':'Done'}</span></h3><p>${s.classGroup} · ${s.date}</p></div>
+      <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--accent)">${recs.length}</div>
+    </div>`;
+  }
+  document.getElementById('stat-total').textContent = ids.length;
+  document.getElementById('stat-today').textContent = todayCount;
+  document.getElementById('stat-records').textContent = totalRecords;
+  document.getElementById('dashboard-recent').innerHTML = recentHtml || '<div class="empty"><div class="empty-icon">📊</div>No sessions yet</div>';
+}
+
+// ══════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════
+async function getSessionRecords(sid) {
+  const keys = await slist('att:' + sid + ':');
+  const records = [];
+  for (const k of keys) { const r = await sget(k); if (r) records.push(r); }
+  records.sort((a, b) => a.timestamp - b.timestamp);
+  return records;
+}
+
+async function exportCSV() {
+  if (!activeSession) return;
+  const records = await getSessionRecords(activeSession.id);
+  downloadCSV(records, activeSession.subject + '_' + activeSession.date);
+}
+
+async function exportDetailCSV() {
+  if (!viewingSessionId) return;
+  const s = await sget('session:' + viewingSessionId);
+  const records = await getSessionRecords(viewingSessionId);
+  downloadCSV(records, (s ? s.subject : 'session') + '_' + (s ? s.date : ''));
+}
+
+function downloadCSV(records, filename) {
+  if (records.length === 0) { toast('No records to export', 'error'); return; }
+  const header = 'No,Name,Matric Number,Timestamp\n';
+  const rows = records.map((r, i) => `${i+1},"${r.name}","${r.matric}","${new Date(r.timestamp).toLocaleString()}"`).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename.replace(/\s+/g, '_') + '.csv';
+  a.click();
+  toast('CSV downloaded', 'success');
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  const titles = { dashboard: 'Dashboard', create: 'New Session', qr: 'Live QR', sessions: 'All Sessions', detail: 'Session Detail' };
+  document.getElementById('topbar-title').textContent = titles[name] || name;
+  const navItems = document.querySelectorAll('.nav-item');
+  const navMap = { dashboard: 0, create: 1, sessions: 3 };
+  if (name === 'qr') { document.getElementById('nav-live').classList.add('active'); }
+  else if (navMap[name] !== undefined) navItems[navMap[name]].classList.add('active');
+
+  if (name === 'sessions') loadSessions();
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'qr' && activeSession) refreshLiveFeed();
+}
+
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ══════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
